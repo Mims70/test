@@ -36,6 +36,12 @@ app.get('/api/hello', async (req, res) => {
     // Log the detected client IP address
     console.log(`Detected client IP: ${client_ip}`);
 
+    // Use the first IP address if x-forwarded-for contains multiple IPs
+    if (client_ip && client_ip.includes(',')) {
+        client_ip = client_ip.split(',')[0].trim();
+        console.log(`Using first IP from x-forwarded-for: ${client_ip}`);
+    }
+
     // Use a public IP address for testing if the IP is private
     if (isPrivateIp(client_ip)) {
         client_ip = '8.8.8.8'; // Example public IP address (Google DNS)
