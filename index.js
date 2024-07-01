@@ -7,9 +7,32 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Helper function to check if an IP address is private
+const isPrivateIp = (ip) => {
+    // IPv4 regex patterns for private addresses
+    const privateIPv4Ranges = [
+        /^127\./, // Loopback
+        /^10\./, // Class A private
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // Class B private
+        /^192\.168\./, // Class C private
+    ];
+
+    // IPv6 loopback address
+    if (ip === '::1' || ip === '::ffff:127.0.0.1') {
+        return true;
+    }
+
+    // Check if the IPv4 address matches any private range
+    return privateIPv4Ranges.some((pattern) => pattern.test(ip));
+};
+
 app.get('/api/hello', async (req, res) => {
     const visitor_name = req.query.visitor_name;
     const client_ip = req.ip;
+
+    if (isPrivateIp(client_ip)) {
+        return res.status(400).json({ error: 'Cannot determine location for private IP addresses' });
+    }
 
     try {
         const locationResponse = await axios.get(`http://ip-api.com/json/${client_ip}`);
