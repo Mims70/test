@@ -14,10 +14,12 @@ app.get('/api/hello', async (req, res) => {
     try {
         const locationResponse = await axios.get(`http://ip-api.com/json/${client_ip}`);
         const locationData = locationResponse.data;
+        console.log(locationData); // Log the response
+
         const city = locationData.city;
 
         if (!city) {
-            throw new Error('Could not determine city from IP');
+            return res.status(400).json({ error: 'Could not determine city from IP' });
         }
 
         const weatherResponse = await axios.get(`http://api.weatherapi.com/v1/current.json?key=${process.env.WEATHER_API_KEY}&q=${city}`);
