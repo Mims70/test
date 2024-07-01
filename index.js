@@ -7,6 +7,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxies to correctly get client IP
+app.set('trust proxy', true);
+
 // Helper function to check if an IP address is private
 const isPrivateIp = (ip) => {
     // IPv4 regex patterns for private addresses
@@ -28,10 +31,14 @@ const isPrivateIp = (ip) => {
 
 app.get('/api/hello', async (req, res) => {
     const visitor_name = req.query.visitor_name;
-    const client_ip = req.ip;
+    let client_ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.ip;
 
+    // Log the detected client IP address
+    console.log(`Detected client IP: ${client_ip}`);
+
+    // Use a public IP address for testing if the IP is private
     if (isPrivateIp(client_ip)) {
-        return res.status(400).json({ error: 'Cannot determine location for private IP addresses' });
+        client_ip = '8.8.8.8'; // Example public IP address (Google DNS)
     }
 
     try {
