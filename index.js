@@ -16,6 +16,10 @@ app.get('/api/hello', async (req, res) => {
         const locationData = locationResponse.data;
         const city = locationData.city;
 
+        if (!city) {
+            throw new Error('Could not determine city from IP');
+        }
+
         const weatherResponse = await axios.get(`http://api.weatherapi.com/v1/current.json?key=${process.env.WEATHER_API_KEY}&q=${city}`);
         const weatherData = weatherResponse.data;
         const temperature = weatherData.current.temp_c;
@@ -26,6 +30,7 @@ app.get('/api/hello', async (req, res) => {
             greeting: `Hello, ${visitor_name}!, the temperature is ${temperature} degrees Celsius in ${city}`
         });
     } catch (error) {
+        console.error(error.message || error); // Log the error message
         res.status(500).json({ error: 'Something went wrong' });
     }
 });
