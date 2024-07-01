@@ -1,78 +1,44 @@
 const express = require('express');
 const axios = require('axios');
 const dotenv = require('dotenv');
-
-dotenv.config();
-
+dotenv.config(); // Load environment variables from .env file
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000; // Port for Heroku deployment or local development
 
-// Trust proxies to correctly get client IP
-app.set('trust proxy', true);
-
-// Helper function to check if an IP address is private
-const isPrivateIp = (ip) => {
-    // IPv4 regex patterns for private addresses
-    const privateIPv4Ranges = [
-        /^127\./, // Loopback
-        /^10\./, // Class A private
-        /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // Class B private
-        /^192\.168\./, // Class C private
-    ];
-
-    // IPv6 loopback address
-    if (ip === '::1' || ip === '::ffff:127.0.0.1') {
-        return true;
-    }
-
-    // Check if the IPv4 address matches any private range
-    return privateIPv4Ranges.some((pattern) => pattern.test(ip));
-};
-
+// Endpoint handling
 app.get('/api/hello', async (req, res) => {
-    const visitor_name = req.query.visitor_name;
-    let client_ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.ip;
+  const visitorName = req.query.visitor_name || 'Guest';
+  const clientIp = req.ip;
 
-    // Log the detected client IP address
-    console.log(`Detected client IP: ${client_ip}`);
+  try {
+    // Step 1: Use IP geolocation API to get the location based on client's IP
+    const locationResponse = await axios.get(`https://ipapi.co/${clientIp}/json/`);
+    console.log('Location Response:', locationResponse.data);
+    const { city } = locationResponse.data;
 
-    // Use the first IP address if x-forwarded-for contains multiple IPs
-    if (client_ip && client_ip.includes(',')) {
-        client_ip = client_ip.split(',')[0].trim();
-        console.log(`Using first IP from x-forwarded-for: ${client_ip}`);
+    if (!city) {
+      throw new Error('City not found from IP geolocation');
     }
 
-    // Use a public IP address for testing if the IP is private
-    if (isPrivateIp(client_ip)) {
-        client_ip = '8.8.8.8'; // Example public IP address (Google DNS)
-    }
+    // Step 2: Use weather API to get real-time weather information
+    const weatherResponse = await axios.get(`http://api.weatherapi.com/v1/current.json?key=${process.env.WEATHER_API_KEY}&q=${city}&aqi=no`);
+    const { temp_c } = weatherResponse.data.current;
 
-    try {
-        const locationResponse = await axios.get(`http://ip-api.com/json/${client_ip}`);
-        const locationData = locationResponse.data;
-        console.log(locationData); // Log the response
+    // Construct the response
+    const response = {
+      client_ip: clientIp,
+      location: city,
+      greeting: `Hello, ${visitorName}!, the temperature is ${temp_c} degrees Celsius in ${city}`
+    };
 
-        const city = locationData.city;
-
-        if (!city) {
-            return res.status(400).json({ error: 'Could not determine city from IP' });
-        }
-
-        const weatherResponse = await axios.get(`http://api.weatherapi.com/v1/current.json?key=${process.env.WEATHER_API_KEY}&q=${city}`);
-        const weatherData = weatherResponse.data;
-        const temperature = weatherData.current.temp_c;
-
-        res.json({
-            client_ip: client_ip,
-            location: city,
-            greeting: `Hello, ${visitor_name}!, the temperature is ${temperature} degrees Celsius in ${city}`
-        });
-    } catch (error) {
-        console.error(error.message || error); // Log the error message
-        res.status(500).json({ error: 'Something went wrong' });
-    }
+    res.json(response);
+  } catch (error) {
+    console.error('Error fetching data:', error.response ? error.response.data : error.message);
+    res.status(500).json({ error: 'Failed to fetch data' });
+  }
 });
 
+// Start the server
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on http://localhost:${PORT}`);
 });
